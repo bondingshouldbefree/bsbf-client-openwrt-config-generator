@@ -216,32 +216,48 @@ cat <<EOF2 > 99-bsbf-bonding
 # Get the interface of lan network.
 lan_network_interface="\$(uci get network.lan.device)"
 
-# If LAN is a bridge, get its members.
-if echo "\$lan_network_interface" | grep -q '^br'; then
-	lan_interfaces="\$(uci get network.@device[0].ports)"
+# Check if lan is a bridge.
+section=\$(uci show network | grep "name='\$lan_network_interface'" | cut -d. -f2)
+if [ -n "\$section" ]; then
+	# Save all interfaces.
+	lan_interfaces=\$(uci get network.\$section.ports)
 
 	# Set biggest number interface as lan network.
 	lan_network_interface="\$(echo \$lan_interfaces | tr ' ' '\\n' | grep '[0-9]\\+\$' | sort -V | tail -n1)"
 	uci set network.lan.device="\$lan_network_interface"
 
 	# Remove bridge interface.
-	uci delete network.@device[0]
+	uci delete network.\$section
 fi
-uci set network.lan.ipaddr='192.168.4.1'
+uci del_list network.lan.ipaddr='192.168.1.1/24'
+uci add_list network.lan.ipaddr='192.168.4.1/24'
 
-# Get the interface of wan network. It won't be a bridge.
+# Get the interface of wan network.
 wan_network_interface="\$(uci get network.wan.device)"
 
-# Add a wan network entry for wan network's interface and lan network
+# Check if wan is a bridge.
+section=\$(uci show network | grep "name='\$wan_network_interface'" | cut -d. -f2)
+if [ -n "\$section" ]; then
+	# Save all interfaces.
+	wan_network_interface="\$(uci get network.\$section.ports)"
+
+	# Remove bridge interface.
+	uci delete network.\$section
+fi
+
+# Add a wan network entry for wan network's interface(s) and lan network
 # interfaces other than the one used for lan, if there are any.
-wan_candidates="\$wan_network_interface \$(echo \$lan_interfaces | tr ' ' '\\n' | grep -v "^\$lan_network_interface\$")"
+final_wan_interfaces="\$wan_network_interface \$(echo \$lan_interfaces | tr ' ' '\\n' | grep -v "^\$lan_network_interface\$")"
 
 # Delete existing wan and wan6 networks.
 uci delete network.wan
 uci delete network.wan6
+section=\$(uci show firewall | grep "name='wan'" | cut -d. -f2)
+uci del_list firewall.\$section.network='wan'
+uci del_list firewall.\$section.network='wan6'
 
 index=1
-for dev in \$wan_candidates; do
+for dev in \$final_wan_interfaces; do
 	[ -z "\$dev" ] && continue
 
 	uci set network.wan\$index=interface
@@ -251,20 +267,20 @@ for dev in \$wan_candidates; do
 	uci set network.wan\$index.metric="\$index"
 
 	# Add every wan network entry to firewall wan zone.
-	uci add_list firewall.@zone[1].network="wan\$index"
+	uci add_list firewall.\$section.network="wan\$index"
 
 	index=\$((index + 1))
 done
 
 # dnsmasq Configuration
 # As we don't want to use the DNS servers advertised by WANs, set up DNS
-# forwarding. Use 8.8.8.8 because some ISPs such as rain SA won't reach 1.1.1.1.
+# forwarding. Use 8.8.8.8 and 8.8.4.4 because some ISPs such as rain SA won't
+# reach 1.1.1.1.
 uci add_list dhcp.@dnsmasq[0].server='8.8.8.8'
+uci add_list dhcp.@dnsmasq[0].server='8.8.4.4'
 
 # Commit changes.
-uci commit dhcp
-uci commit network
-uci commit firewall
+uci commit
 
 # mptcpd Configuration
 cat <<'EOF' > /etc/mptcpd/mptcpd.conf
