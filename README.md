@@ -1,9 +1,8 @@
 ```
-Usage: ./bsbf-client-openwrt-imagebuilder-config-generator.sh
-       --server-ipv4 <ADDR> --server-port <PORT> --uuid <UUID> [--xray --v2ray
-       --tcp-in-udp-big-endian --no-luci --dongle-modem --quectel-modem
-       --usb-adapters-and-android-tethering --ios-tethering --mikrotik-tools
-       --debug-tools --perf-test]
+Usage: ./bsbf-client-openwrt-config-generator.sh --server-ipv4 <ADDR>
+       --server-port <PORT> --uuid <UUID> [--tcp-in-udp-big-endian --no-luci
+       --dongle-modem --quectel-modem --usb-adapters-and-android-tethering
+       --ios-tethering --mikrotik-tools --debug-tools --perf-test]
 ```
 
 Once the script is run, the package list and the uci-defaults script can be used
